@@ -25,19 +25,18 @@ import java.io.Serializable;
 import java.util.*;
 
 import static com.lucidworks.spark.util.SolrQuerySupport.*;
-import java.util.function.BiConsumer;
 
 /**
- * Util classes to deal with Solr schema and Spark sql schema TODO: Refactor the
- * methods to use CloudSolrClient rather than building one themselves
+ * Util classes to deal with Solr schema and Spark sql schema
+ * TODO: Refactor the methods to use CloudSolrClient rather than building one themselves
  */
-public class SolrSchemaUtil implements Serializable {
+public class SolrSchemaUtil implements Serializable{
 
     public static Logger log = Logger.getLogger(SolrSchemaUtil.class);
 
     public static StructType readSchema(SolrDocument doc, SolrClient Solr, String collection) throws IOException, SolrServerException {
         List<StructField> fields = new ArrayList<>();
-        StructType st = (StructType) recurseReadSchema(doc, Solr, fields, collection).dataType();
+    StructType st= (StructType) recurseReadSchema(doc, Solr, fields, collection).dataType();
         return st;
     }
 
@@ -53,7 +52,7 @@ public class SolrSchemaUtil implements Serializable {
                     SolrQuery q1 = new SolrQuery("id:" + id);
                     QueryResponse rsp1 = null;
                     try {
-                        rsp1 = solr.query(collection, q1);
+            rsp1 = solr.query(collection,q1);
                     } catch (Exception E) {
                         log.error(E.toString());
                         recurse = false;
@@ -65,7 +64,7 @@ public class SolrSchemaUtil implements Serializable {
                     }
                 }
             }
-            if (name.substring(name.length() - 2, name.length()).equals("_s") && !name.equals("__lwroot_s") && !name.startsWith("links") && !name.equals("__lwcategory_s")) {
+      if (name.substring(name.length()-2,name.length()).equals("_s")  && !name.equals("__lwroot_s") && !name.startsWith("links") && !name.equals("__lwcategory_s")) {
                 if (name.substring(0, name.length() - 2).equals("__lwchilddocname")) {
                     finalName = field.getValue().toString();
                 } else {
@@ -80,32 +79,35 @@ public class SolrSchemaUtil implements Serializable {
         if (finalName == null) {
             finalName = "root";
         }
-        return new StructField(finalName, st2, true, Metadata.empty());
+    return new StructField(finalName, st2, true,  Metadata.empty());
     }
 
-    public static void recurseWriteSchema(StructType st, SolrInputDocument s, int l) {
+  public static void recurseWriteSchema(StructType st, SolrInputDocument s, int l){
         scala.collection.Iterator x = st.iterator();
         int linkCount = 0;
         while (x.hasNext()) {
             StructField sf = (StructField) x.next();
-            if (sf.dataType().typeName().toString().toLowerCase().equals("struct")) {
+      if (sf.dataType().typeName().toString().toLowerCase().equals("struct")){
                 linkCount = linkCount + 1;
                 SolrInputDocument sc = new SolrInputDocument();
                 String id = UUID.randomUUID().toString();
-                sc.addField("id", id);
-                s.addField("links" + linkCount + "_s", id);
+        sc.addField("id",id);
+        s.addField("links"+linkCount +"_s", id);
                 l = l + 1;
-                sc.addField("__lwchilddocname_s", sf.name());
-                sc.addField("__lwcategory_s", "schema");
+        sc.addField("__lwchilddocname_s",sf.name());
+        sc.addField("__lwcategory_s","schema");
                 recurseWriteSchema((StructType) sf.dataType(), sc, l);
                 s.addChildDocument(sc);
-            } else if (!sf.dataType().typeName().toLowerCase().equals("array")) {
+      } else {
+        if (!sf.dataType().typeName().toLowerCase().equals("array")) {
                 s.addField(sf.name() + "_s", sf.dataType().typeName());
             } else {
                 s.addField(sf.name() + "_s", ScalaUtil.getArraySchema(sf.dataType()));
             }
         }
     }
+  }
+
 
     public static Map<String, SolrFieldMeta> getSchemaFields(String solrBaseUrl, String collection) throws SparkException {
         return getFieldTypes(new String[]{}, solrBaseUrl, collection);
@@ -113,16 +115,15 @@ public class SolrSchemaUtil implements Serializable {
 
     /**
      * Get the schema information from Luke
-     *
      * @param solrBaseUrl
      * @param collection
      * @return
      * @throws SparkException
      */
     public static Map<String, SolrFieldMeta> getSchemaFieldsFromLuke(String solrBaseUrl, String collection) throws SparkException {
-        String lukeUrl = solrBaseUrl + collection + "/schema";
+    String lukeUrl = solrBaseUrl + collection + "/schema";
         // collect mapping of Solr field to type
-        Map<String, SolrFieldMeta> schemaFieldMap = new HashMap<String, SolrFieldMeta>();
+    Map<String,SolrFieldMeta> schemaFieldMap = new HashMap<String, SolrFieldMeta>();
         try {
             try {
                 Map<String, Object> adminMeta = SolrJsonSupport.getJson(SolrJsonSupport.getHttpClient(), lukeUrl, 2);
@@ -138,10 +139,10 @@ public class SolrSchemaUtil implements Serializable {
                 }
                 schemaFieldMap = getFieldTypes(arr, solrBaseUrl, collection);
             } catch (SolrException solrExc) {
-                log.warn("Can't get field types for " + collection + " due to: " + solrExc);
+        log.warn("Can't get field types for " + collection + " due to: "+solrExc);
             }
         } catch (Exception exc) {
-            log.warn("Can't get schema fields for " + collection + " due to: " + exc);
+      log.warn("Can't get schema fields for " + collection + " due to: "+exc);
         }
         return schemaFieldMap;
     }
@@ -157,34 +158,20 @@ public class SolrSchemaUtil implements Serializable {
             MetadataBuilder metadata = new MetadataBuilder();
             metadata.putString("name", field.getKey());
             DataType dataType = (fieldMeta.fieldTypeClass != null) ? SolrQuerySupport.SOLR_DATA_TYPES.get(fieldMeta.fieldTypeClass) : null;
-            if (dataType == null) {
-                dataType = DataTypes.StringType;
-            }
+      if (dataType == null) dataType = DataTypes.StringType;
 
             if (fieldMeta.isMultiValued) {
                 dataType = new ArrayType(dataType, true);
                 metadata.putBoolean("multiValued", fieldMeta.isMultiValued);
             }
-            if (fieldMeta.isRequired) {
-                metadata.putBoolean("required", fieldMeta.isRequired);
-            }
-            if (fieldMeta.isDocValues) {
-                metadata.putBoolean("docValues", fieldMeta.isDocValues);
-            }
-            if (fieldMeta.isStored) {
-                metadata.putBoolean("stored", fieldMeta.isStored);
-            }
-            if (fieldMeta.fieldType != null) {
-                metadata.putString("type", fieldMeta.fieldType);
-            }
-            if (fieldMeta.dynamicBase != null) {
-                metadata.putString("dynamicBase", fieldMeta.dynamicBase);
-            }
-            if (fieldMeta.fieldTypeClass != null) {
-                metadata.putString("class", fieldMeta.fieldTypeClass);
-            }
+      if (fieldMeta.isRequired) metadata.putBoolean("required", fieldMeta.isRequired);
+      if (fieldMeta.isDocValues) metadata.putBoolean("docValues", fieldMeta.isDocValues);
+      if (fieldMeta.isStored) metadata.putBoolean("stored", fieldMeta.isStored);
+      if (fieldMeta.fieldType != null) metadata.putString("type", fieldMeta.fieldType);
+      if (fieldMeta.dynamicBase != null) metadata.putString("dynamicBase", fieldMeta.dynamicBase);
+      if (fieldMeta.fieldTypeClass != null) metadata.putString("class", fieldMeta.fieldTypeClass);
             if (escapeFields) {
-                fieldName = fieldName.replaceAll("\\.", "_");
+        fieldName = fieldName.replaceAll("\\.","_");
             }
             listOfFields.add(DataTypes.createStructField(fieldName, dataType, !fieldMeta.isRequired, metadata.build()));
         }
@@ -195,13 +182,9 @@ public class SolrSchemaUtil implements Serializable {
     // derive a schema for a specific query from the full collection schema
     public static StructType deriveQuerySchema(String[] fields, StructType schema) {
         Map<String, StructField> fieldMap = new HashMap<String, StructField>();
-        for (StructField f : schema.fields()) {
-            fieldMap.put(f.name(), f);
-        }
+    for (StructField f : schema.fields()) fieldMap.put(f.name(), f);
         List<StructField> listOfFields = new ArrayList<StructField>();
-        for (String field : fields) {
-            listOfFields.add(fieldMap.get(field));
-        }
+    for (String field : fields) listOfFields.add(fieldMap.get(field));
         return DataTypes.createStructType(listOfFields);
     }
 
@@ -223,15 +206,15 @@ public class SolrSchemaUtil implements Serializable {
 
     public static void applyFilter(Filter filter, SolrQuery solrQuery, StructType baseSchema) {
         if (filter instanceof And) {
-            And and = (And) filter;
+      And and = (And)filter;
             solrQuery.addFilterQuery(fq(and.left(), baseSchema));
             solrQuery.addFilterQuery(fq(and.right(), baseSchema));
         } else if (filter instanceof Or) {
-            Or f = (Or) filter;
-            solrQuery.addFilterQuery("(" + fq(f.left(), baseSchema) + " OR " + fq(f.right(), baseSchema) + ")");
+      Or f = (Or)filter;
+      solrQuery.addFilterQuery("(" + fq(f.left(), baseSchema)+" OR " + fq(f.right(), baseSchema)+")");
         } else if (filter instanceof Not) {
-            Not not = (Not) filter;
-            solrQuery.addFilterQuery("NOT " + fq(not.child(), baseSchema));
+      Not not = (Not)filter;
+      solrQuery.addFilterQuery("NOT "+fq(not.child(), baseSchema));
         } else {
             solrQuery.addFilterQuery(fq(filter, baseSchema));
         }
@@ -242,75 +225,71 @@ public class SolrSchemaUtil implements Serializable {
         String crit = null;
         String attr = null;
         if (f instanceof EqualTo) {
-            EqualTo eq = (EqualTo) f;
+      EqualTo eq = (EqualTo)f;
             attr = eq.attribute();
             crit = String.valueOf(eq.value());
         } else if (f instanceof EqualNullSafe) {
-            EqualNullSafe eq = (EqualNullSafe) f;
+      EqualNullSafe eq = (EqualNullSafe)f;
             attr = eq.attribute();
             crit = String.valueOf(eq.value());
         } else if (f instanceof GreaterThan) {
-            GreaterThan gt = (GreaterThan) f;
+      GreaterThan gt = (GreaterThan)f;
             attr = gt.attribute();
-            crit = "{" + gt.value() + " TO *]";
+      crit = "{"+gt.value()+" TO *]";
         } else if (f instanceof GreaterThanOrEqual) {
-            GreaterThanOrEqual gte = (GreaterThanOrEqual) f;
+      GreaterThanOrEqual gte = (GreaterThanOrEqual)f;
             attr = gte.attribute();
-            crit = "[" + gte.value() + " TO *]";
+      crit = "["+gte.value()+" TO *]";
         } else if (f instanceof LessThan) {
-            LessThan lt = (LessThan) f;
+      LessThan lt = (LessThan)f;
             attr = lt.attribute();
-            crit = "[* TO " + lt.value() + "}";
+      crit = "[* TO "+lt.value()+"}";
         } else if (f instanceof LessThanOrEqual) {
-            LessThanOrEqual lte = (LessThanOrEqual) f;
+      LessThanOrEqual lte = (LessThanOrEqual)f;
             attr = lte.attribute();
             crit = "[* TO " + lte.value() + "]";
         } else if (f instanceof In) {
-            In inf = (In) f;
+      In inf = (In)f;
             attr = inf.attribute();
             StringBuilder sb = new StringBuilder();
             sb.append("(");
             Object[] vals = inf.values();
-            for (int v = 0; v < vals.length; v++) {
-                if (v > 0) {
-                    sb.append(" ");
-                }
+      for (int v=0; v < vals.length; v++) {
+        if (v > 0) sb.append(" ");
                 sb.append(String.valueOf(vals[v]));
             }
             sb.append(")");
             crit = sb.toString();
         } else if (f instanceof IsNotNull) {
-            IsNotNull inn = (IsNotNull) f;
+      IsNotNull inn = (IsNotNull)f;
             attr = inn.attribute();
             crit = "[* TO *]";
         } else if (f instanceof IsNull) {
-            IsNull isn = (IsNull) f;
+      IsNull isn = (IsNull)f;
             attr = isn.attribute();
             crit = "[* TO *]";
             negate = "-";
         } else if (f instanceof StringContains) {
-            StringContains sc = (StringContains) f;
+      StringContains sc = (StringContains)f;
             attr = sc.attribute();
-            crit = "*" + sc.value() + "*";
+      crit = "*"+sc.value()+"*";
         } else if (f instanceof StringEndsWith) {
-            StringEndsWith sew = (StringEndsWith) f;
+      StringEndsWith sew = (StringEndsWith)f;
             attr = sew.attribute();
-            crit = sew.value() + "*";
+      crit = sew.value()+"*";
         } else if (f instanceof StringStartsWith) {
-            StringStartsWith ssw = (StringStartsWith) f;
+      StringStartsWith ssw = (StringStartsWith)f;
             attr = ssw.attribute();
-            crit = "*" + ssw.value();
+      crit = "*"+ssw.value();
         } else {
-            throw new IllegalArgumentException("Filters of type '" + f + " (" + f.getClass().getName() + ")' not supported!");
+      throw new IllegalArgumentException("Filters of type '"+f+" ("+f.getClass().getName()+")' not supported!");
         }
         return negate + attributeToFieldName(attr, baseSchema) + ":" + crit;
     }
 
     public static String attributeToFieldName(String attribute, StructType baseSchema) {
-        Map<String, StructField> fieldMap = new HashMap<String, StructField>();
-        for (StructField f : baseSchema.fields()) {
-            fieldMap.put(f.name(), f);
-        }
+    Map<String,StructField> fieldMap = new HashMap<String,StructField>();
+    for (StructField f : baseSchema.fields()) fieldMap.put(f.name(), f);
         StructField field = fieldMap.get(attribute.replaceAll("`", ""));
         if (field != null) {
             Metadata meta = field.metadata();
@@ -354,7 +333,7 @@ public class SolrSchemaUtil implements Serializable {
     }
 
     public static void setAliases(String[] fields, SolrQuery solrQuery, StructType schema) {
-        Map<String, StructField> fieldMap = new HashMap<String, StructField>();
+    Map<String,StructField> fieldMap = new HashMap<String,StructField>();
         for (StructField f : schema.fields()) {
             fieldMap.put(f.name(), f);
         }
@@ -368,7 +347,7 @@ public class SolrSchemaUtil implements Serializable {
                 Boolean isDocValues = meta.contains("docValues") ? meta.getBoolean("docValues") : false;
                 Boolean isStored = meta.contains("stored") ? meta.getBoolean("stored") : false;
                 if (!isStored && isDocValues && !isMultiValued) {
-                    fieldList[f] = field.name() + ":field(" + fieldName + ")";
+          fieldList[f] = field.name() + ":field("+fieldName+")";
                 } else {
                     fieldList[f] = field.name() + ":" + fieldName;
                 }
